@@ -9,7 +9,7 @@ const loginUser = async (req, res) => {
     const isThere = await register.findOne({ username });
 
     if (isThere === null) {
-      res.status(400).send("User does not exist, register user before trying.");
+      res.json("User does not exist, register user before trying"); //.status(400)
     } else {
       const userId = isThere._id;
       if (isThere.username === username) {
@@ -34,9 +34,9 @@ const loginUser = async (req, res) => {
             secure: true,
             sameSite: "Strict",
           });
-          res.status(200).json({ accesstoken, refreshtoken, login: true });
+          res.status(200).json("Login Sucessfull!"); // for testing send accesstoken, refreshtoken
         } else {
-          res.status(401).json({ login: false });
+          res.json("Incorrect Credentials");
         }
       }
     }
@@ -57,74 +57,123 @@ const registerUser = async (req, res) => {
       const data = await register.create({ name, username, password: hashPass }).then((dt) => {
         //create register user
         console.log(dt); // remove later
-        res.status(201).send("User Created Sucessfully");
+        res.status(201).json("User Created Sucessfully");
       });
     } else {
       if (isThere.username === username) {
-        res.status(400).send(`User already exist using username ${username}, try other usernames`); // if user exist retn 400
+        res.json(`User already exist using username ${username}, try other usernames`);
       }
     }
   } catch (err) {
     console.log(err);
-    res.status(500).send("Internal Server Error");
+    res.status(500).json("Internal Server Error");
   }
 };
 
 const isUserValid = async (req, res, next) => {
   try {
     const accesstoken = req.cookies.accesstoken;
+    const refreshtoken = req.cookies.refreshtoken;
+
     if (!accesstoken) {
-      renewToken(req, res, next);
-      next();
+      if (!refreshtoken) {
+        return res.status(401).json({ valid: false, message: "No tokens provided" });
+      } else {
+        JWT.verify(refreshtoken, process.env.JWTREFRESHTOKENSECRET, (err, decode) => {
+          if (err) {
+            console.log(err);
+            return res.status(401).json({ valid: false, message: "Invalid refresh token" });
+          } else {
+            username = decode.username;
+            userId = decode.userId;
+            const newAccessToken = JWT.sign(
+              { username, userId },
+              process.env.JWTACCESSTOKENSECRET,
+              {
+                expiresIn: "10s",
+              }
+            );
+
+            res.cookie("accesstoken", newAccessToken, {
+              maxAge: 60000,
+              httpOnly: true,
+              secure: true,
+            });
+            next();
+          }
+        });
+      }
     } else {
       JWT.verify(accesstoken, process.env.JWTACCESSTOKENSECRET, (err, decode) => {
         if (err) {
           console.log(err);
-          res.status(401).json({ valid: false, message: "Invalid access token" });
+          return res.status(401).json({ valid: false, message: "Invalid access token" });
         } else {
-          res.status(200).json({ msg: "Accesstoken Valid" });
-          next();
+          return next();
         }
       });
     }
   } catch (err) {
     console.log(err);
-    res.status(500).send("Internal Server Error");
+    return res.status(500).send("Internal Server Error");
   }
 };
 
-const renewToken = async (req, res, next) => {
-  try {
-    const refreshtoken = req.cookies.refreshtoken;
-    if (refreshtoken) {
-      JWT.verify(refreshtoken, process.env.JWTREFRESHTOKENSECRET, (err, decode) => {
-        if (err) {
-          console.log(err);
-          res.status(401).json({ valid: false, message: "Invalid refresh token" });
-        } else {
-          username = decode.username;
-          userId = decode.userId;
-          const accesstoken = JWT.sign({ username, userId }, process.env.JWTACCESSTOKENSECRET, {
-            expiresIn: "10s",
-          });
+// const isUserValid = async (req, res, next) => {
+//   try {
+//     const accesstoken = req.cookies.accesstoken;
+//     if (!accesstoken) {
+//       renewToken(req, res, next);
+//       next();
+//     } else {
+//       JWT.verify(accesstoken, process.env.JWTACCESSTOKENSECRET, (err, decode) => {
+//         if (err) {
+//           console.log(err);
+//           res.status(401).json({ valid: false, message: "Invalid access token" });
+//         } else {
+//           res.status(200).json({ msg: "Accesstoken Valid" });
+//           next();
+//         }
+//       });
+//     }
+//   } catch (err) {
+//     console.log(err);
+//     res.status(500).send("Internal Server Error");
+//   }
+// };
 
-          res.cookie("accesstoken", accesstoken, {
-            maxAge: 60000,
-            httpOnly: true,
-            secure: true,
-          });
-          res.status(200).json({ msg: "Accesstoken Renewed" });
-          next();
-        }
-      });
-    } else {
-      // res.status(401).json({ valid: false, message: "No token provided" });
-      next();
-    }
-  } catch (err) {
-    console.log(err);
-    res.status(500).send("Internal Server Error");
-  }
-};
+// const renewToken = async (req, res, next) => {
+//   try {
+//     const refreshtoken = req.cookies.refreshtoken;
+//     if (refreshtoken) {
+//       JWT.verify(refreshtoken, process.env.JWTREFRESHTOKENSECRET, (err, decode) => {
+//         if (err) {
+//           console.log(err);
+//           res.status(401).json({ valid: false, message: "Invalid refresh token" });
+//         } else {
+//           username = decode.username;
+//           userId = decode.userId;
+//           const accesstoken = JWT.sign({ username, userId }, process.env.JWTACCESSTOKENSECRET, {
+//             expiresIn: "10s",
+//           });
+
+//           res.cookie("accesstoken", accesstoken, {
+//             maxAge: 60000,
+//             httpOnly: true,
+//             secure: true,
+//           });
+//           res.status(200).json({ msg: "Accesstoken Renewed" });
+//           next();
+//         }
+//       });
+//     } else {
+//       // res.status(401).json({ valid: false, message: "No token provided" });
+//       next();
+//     }
+//   } catch (err) {
+//     console.log(err);
+//     res.status(500).send("Internal Server Error");
+//   }
+// };
 
 module.exports = { loginUser, registerUser, isUserValid };
