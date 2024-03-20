@@ -3,6 +3,18 @@ const bcrypt = require("bcrypt");
 const JWT = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 
+//get user data as profile
+
+const UserData = async (req, res) => {
+  const { username } = req.body;
+  res.status(200).json(username);
+  try {
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
 const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -15,7 +27,7 @@ const loginUser = async (req, res) => {
       if (isThere.username === username) {
         if (await bcrypt.compare(password, isThere.password)) {
           const accesstoken = JWT.sign({ username, userId }, process.env.JWTACCESSTOKENSECRET, {
-            expiresIn: "8s",
+            expiresIn: "10m",
           });
           const refreshtoken = JWT.sign({ username, userId }, process.env.JWTREFRESHTOKENSECRET, {
             expiresIn: "12m",
@@ -49,6 +61,7 @@ const loginUser = async (req, res) => {
 const registerUser = async (req, res) => {
   try {
     const { name, username, password } = req.body;
+    const role = "User";
     const isThere = await register.findOne({ username }); //check if user exists returns an object|null
 
     if (isThere === null) {
@@ -57,7 +70,7 @@ const registerUser = async (req, res) => {
       const data = await register.create({ name, username, password: hashPass }).then((dt) => {
         //create register user
         console.log(dt); // remove later
-        res.status(201).json("User Created Sucessfully");
+        res.status(201).json(dt);
       });
     } else {
       if (isThere.username === username) {
@@ -77,7 +90,7 @@ const isUserValid = async (req, res, next) => {
 
     if (!accesstoken) {
       if (!refreshtoken) {
-        return res.status(401).json({ valid: false, message: "No tokens provided" });
+        return res.status(401).json({ message: "User not logged in" });
       } else {
         JWT.verify(refreshtoken, process.env.JWTREFRESHTOKENSECRET, (err, decode) => {
           if (err) {
@@ -176,4 +189,4 @@ const isUserValid = async (req, res, next) => {
 //   }
 // };
 
-module.exports = { loginUser, registerUser, isUserValid };
+module.exports = { loginUser, registerUser, isUserValid, UserData };

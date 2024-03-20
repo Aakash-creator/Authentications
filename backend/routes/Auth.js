@@ -14,4 +14,8 @@ router.get("/test", isUserValid, (req, res) => {
   res.send("working at auth.js");
 });
 
+router.get("/dashboard", isUserValid, (req, res) => {
+  res.send("This is a User Dashboard");
+});
+
 module.exports = router;
